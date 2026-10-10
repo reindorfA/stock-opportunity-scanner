@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101827">
+<title>Stock Opportunity Scanner</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#121d2f;--panel2:#18263b;--line:#2a3a52;--text:#edf3fb;--muted:#9aacc3;--accent:#79e0bb;--warn:#ffd479;--bad:#ff9b9b}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#101a2b 0,#0b1220 360px);color:var(--text);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:1100px;margin:auto;padding:24px 16px 56px}.hero{padding:14px 2px 22px}.eyebrow{color:var(--accent);font-weight:700;letter-spacing:.12em;text-transform:uppercase;font-size:12px}.hero h1{font-size:clamp(29px,6vw,44px);line-height:1.05;margin:10px 0}.hero p{color:var(--muted);max-width:720px;margin:0}
+.panel{background:rgba(18,29,47,.94);border:1px solid var(--line);border-radius:18px;padding:18px;margin:14px 0;box-shadow:0 12px 30px #0002}.panel h2{font-size:18px;margin:0 0 14px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.field{display:flex;flex-direction:column;gap:6px}.field.full{grid-column:1/-1}label{font-size:13px;color:var(--muted)}input,select,button{font:inherit;border-radius:11px;border:1px solid var(--line);padding:12px;background:#0d1727;color:var(--text);min-width:0}input:focus,select:focus{outline:2px solid #79e0bb88;border-color:var(--accent)}.hint{color:var(--muted);font-size:12px;margin:8px 0 0}.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:15px}button{cursor:pointer;font-weight:700}button.primary{background:var(--accent);color:#082219;border-color:var(--accent)}button:disabled{opacity:.55;cursor:wait}.status{margin-top:12px;color:var(--muted);font-size:14px;min-height:20px}.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.metric{padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}.metric .label{color:var(--muted);font-size:12px}.metric .value{font-size:24px;font-weight:750;margin-top:4px}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:750px}th,td{text-align:left;padding:12px 10px;border-bottom:1px solid var(--line);font-size:13px;white-space:nowrap}th{color:var(--muted);font-weight:600}td strong{font-size:14px}.pill{display:inline-block;border-radius:999px;padding:4px 8px;background:#26374d;font-size:12px}.good{color:var(--accent)}.bad{color:var(--bad)}.warning{color:var(--warn)}.empty{color:var(--muted);padding:22px 0;text-align:center}.foot{font-size:12px;color:var(--muted);line-height:1.6}.foot a{color:var(--accent)}.risk{border-left:3px solid var(--warn);padding:10px 12px;background:#2b261a;border-radius:0 10px 10px 0;color:#f5dfae;font-size:13px;margin-top:14px}.score{font-weight:800;font-size:16px}.sub{display:block;color:var(--muted);font-size:11px;margin-top:2px}a{color:var(--accent)}@media(max-width:640px){main{padding:16px 12px 40px}.grid{grid-template-columns:1fr}.field.full{grid-column:auto}.cards{grid-template-columns:1fr}.panel{padding:14px}.hero{padding-top:6px}}
+</style>
+</head>
+<body>
+<main>
+<header class="hero">
+<div class="eyebrow">Research dashboard · v1</div>
+<h1>Stock Opportunity Scanner</h1>
+<p>Screen a watchlist using historical price momentum and moving-average trends. Scores are a research aid—not predictions or personalized investment advice.</p>
+</header>
+
+<section class="panel">
+<h2>1. Configure your scan</h2>
+<div class="grid">
+<div class="field full"><label for="key">Alpha Vantage API key</label><input id="key" type="password" autocomplete="off" placeholder="Paste your API key here"><p class="hint">The key stays in this page's memory and is not saved. Get a key at <a href="https://www.alphavantage.co/support/#api-key" target="_blank" rel="noopener">Alpha Vantage</a>.</p></div>
+<div class="field full"><label for="symbols">Ticker symbols (comma-separated)</label><input id="symbols" value="AAPL, MSFT, NVDA, AMZN, GOOGL" autocapitalize="characters" placeholder="AAPL, MSFT, NVDA"></div>
+<div class="field"><label for="minScore">Minimum score to highlight</label><select id="minScore"><option value="0">Show all scores</option><option value="40">40 / 100</option><option value="60" selected>60 / 100</option><option value="75">75 / 100</option></select></div>
+<div class="field"><label for="sortBy">Sort results by</label><select id="sortBy"><option value="score">Opportunity score</option><option value="momentum">20-day momentum</option><option value="marketcap">Score (price trends)</option><option value="symbol">Ticker A–Z</option></select></div>
+</div>
+<div class="actions"><button class="primary" id="scanBtn">Run watchlist scan</button><button id="exportBtn" disabled>Export CSV</button><button id="clearBtn">Clear results</button></div>
+<div class="status" id="status" role="status" aria-live="polite">Ready. Enter your API key to fetch current provider data.</div>
+<div class="risk">API limits apply. This first version scans only the tickers you enter, making sequential requests to reduce load. Provider access, data freshness, and free-tier limits can vary. Do not treat missing data as a negative signal.</div>
+</section>
+
+<section class="panel">
+<h2>2. Scan overview</h2>
+<div class="cards">
+<div class="metric"><div class="label">Stocks analyzed</div><div class="value" id="count">—</div></div>
+<div class="metric"><div class="label">Average score</div><div class="value" id="average">—</div></div>
+<div class="metric"><div class="label">Above score threshold</div><div class="value" id="shortlist">—</div></div>
+</div>
+</section>
+
+<section class="panel">
+<h2>3. Ranked research candidates</h2>
+<div class="table-wrap"><table><thead><tr><th>Rank / ticker</th><th>Score</th><th>Latest close</th><th>20-day return</th><th>5-day return</th><th>Above 50-day avg.</th><th>50-day vs. 100-day trend</th><th>Research</th></tr></thead><tbody id="results"><tr><td colspan="9" class="empty">Run a scan to populate this table.</td></tr></tbody></table></div>
+<p class="hint">Returns use daily closing prices and are historical—not forecasts. This version uses price history only; it does not evaluate earnings, valuation, debt, or cash flow.</p>
+</section>
+
+<section class="panel">
+<h2>How the score works</h2>
+<p class="foot">The 0–100 score is a price-only screening heuristic: 30 points for positive 20-day momentum, 15 points for positive 5-day momentum, 30 points for price above its 50-day average, and 25 points when the 50-day average is above the 100-day average. It requires enough daily price history for the moving averages. This score is not a forecast and does not measure valuation, earnings quality, debt, cash flow, or future events.</p>
+<p class="foot">For a fuller process, inspect the company's latest filings, earnings, cash flow, debt, competitive position, and risks. Compare companies within the same industry. Never invest solely because a stock scores well.</p>
+</section>
+<footer class="foot">Price data source: Alpha Vantage. This independent demo is not affiliated with Alpha Vantage. No brokerage connection or trades are made. Quotes may be delayed. <a href="https://www.alphavantage.co/documentation/" target="_blank" rel="noopener">API documentation</a> · <a href="https://www.sec.gov/edgar/search/" target="_blank" rel="noopener">SEC company filings</a></footer>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let scanResults = [];
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+function num(v){ if(v===undefined||v===null||v===""||v==="None"||v==="NaN") return null; const n=Number(v); return Number.isFinite(n)?n:null; }
+function money(v){ if(v==null)return "—"; return new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:v<10?2:0}).format(v); }
+function compact(v){if(v==null)return "—";return new Intl.NumberFormat("en-US",{notation:"compact",maximumFractionDigits:1}).format(v);}
+function pct(v){return v==null?"—":`${v>=0?"+":""}${v.toFixed(2)}%`;}
+function safe(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+async function api(params,key){
+ const url=new URL("https://www.alphavantage.co/query");
+ Object.entries({...params,apikey:key}).forEach(([k,v])=>url.searchParams.set(k,v));
+ const response=await fetch(url.toString());
+ if(!response.ok)throw new Error(`HTTP ${response.status}`);
+ const data=await response.json();
+ if(data.Note||data.Information)throw new Error(data.Note||data.Information);
+ if(data["Error Message"])throw new Error(data["Error Message"]);
+ return data;
+}
+function scoreStock(s){
+  let score=0;
+  if(s.momentum!=null && s.momentum>0)score+=30;
+  if(s.momentum5!=null && s.momentum5>0)score+=15;
+  if(s.above50===true)score+=30;
+  if(s.trend50v100===true)score+=25;
+  return score;
+}
+async function analyze(symbol,key){
+  // Price-only scan: skip OVERVIEW, which may require a premium subscription.
+  const daily=await api({function:"TIME_SERIES_DAILY",symbol,outputsize:"compact"},key);
+  const series=daily["Time Series (Daily)"];
+  if(!series)throw new Error(daily.Note||daily.Information||"No daily price series returned");
+  const days=Object.entries(series).sort((a,b)=>b[0].localeCompare(a[0]));
+  const closes=days.map(([date,row])=>({date,close:num(row["4. close"])})).filter(x=>x.close!=null);
+  if(closes.length<50)throw new Error("Not enough daily price history returned");
+  const latest=closes[0].close;
+  const older5=closes[Math.min(5,closes.length-1)]?.close;
+  const older20=closes[Math.min(20,closes.length-1)]?.close;
+  const momentum5=older5?((latest/older5)-1)*100:null;
+  const momentum=older20?((latest/older20)-1)*100:null;
+  const sample50=closes.slice(0,50);
+  const avg50=sample50.reduce((a,x)=>a+x.close,0)/sample50.length;
+  const sample100=closes.slice(0,100);
+  const avg100=sample100.length>=100?sample100.reduce((a,x)=>a+x.close,0)/sample100.length:null;
+  const s={
+    symbol,
+    name:symbol,
+    date:closes[0].date,
+    price:latest,
+    momentum,
+    momentum5,
+    avg50,
+    avg100,
+    above50:latest>avg50,
+    trend50v100:avg100==null?null:avg50>avg100
+  };
+  s.score=scoreStock(s);
+  return s;
+}
+function render(){
+  const sort=$("sortBy").value;
+  const sorted=[...scanResults].sort((a,b)=>sort==="momentum"?(b.momentum??-Infinity)-(a.momentum??-Infinity):sort==="marketcap"?(b.score-a.score):sort==="symbol"?a.symbol.localeCompare(b.symbol):b.score-a.score);
+  const threshold=Number($("minScore").value);
+  $("count").textContent=scanResults.length;
+  $("average").textContent=scanResults.length?`${Math.round(scanResults.reduce((n,x)=>n+x.score,0)/scanResults.length)}/100`:"—";
+  $("shortlist").textContent=scanResults.filter(x=>x.score>=threshold).length;
+  $("exportBtn").disabled=!scanResults.length;
+  $("results").innerHTML=sorted.length?sorted.map((s,i)=>`<tr><td><strong>${i+1}. ${safe(s.symbol)}</strong><span class="sub">Price-history scan</span></td><td><span class="score ${s.score>=threshold?'good':''}">${s.score}/100</span><span class="sub">${s.score>=threshold?'Meets threshold':'Below threshold'}</span></td><td>${money(s.price)}<span class="sub">${safe(s.date)}</span></td><td class="${s.momentum>0?'good':s.momentum<0?'bad':''}">${pct(s.momentum)}</td><td class="${s.momentum5>0?'good':s.momentum5<0?'bad':''}">${pct(s.momentum5)}</td><td>${s.above50?'<span class="good">Yes</span>':'<span class="bad">No</span>'}</td><td>${s.trend50v100==null?'N/A':s.trend50v100?'<span class="good">50d above 100d</span>':'<span class="bad">50d below 100d</span>'}</td><td><a href="https://www.google.com/search?q=${encodeURIComponent(s.symbol+' stock latest news earnings risks')}" target="_blank" rel="noopener">News ↗</a> · <a href="https://www.sec.gov/edgar/search/#/q=${encodeURIComponent(s.symbol)}" target="_blank" rel="noopener">SEC ↗</a></td></tr>`).join(""):'<tr><td colspan="8" class="empty">No successful results yet.</td></tr>';
+}
+$("scanBtn").addEventListener("click",async()=>{
+ const key=$("key").value.trim();
+ const symbols=[...new Set($("symbols").value.toUpperCase().split(/[,\s]+/).map(s=>s.trim()).filter(s=>/^[A-Z][A-Z0-9.-]{0,9}$/.test(s)))].slice(0,12);
+ if(!key){$("status").textContent="Please enter an Alpha Vantage API key.";return;}
+ if(!symbols.length){$("status").textContent="Enter at least one valid ticker symbol.";return;}
+ if(symbols.length>12){$("status").textContent="For this version, use up to 12 tickers per scan.";return;}
+ scanResults=[];render();$("scanBtn").disabled=true;
+ let errors=[];
+ try{
+  for(let i=0;i<symbols.length;i++){
+   $("status").textContent=`Scanning ${symbols[i]} (${i+1} of ${symbols.length})…`;
+   try{const result=await analyze(symbols[i],key);scanResults.push(result);render();}
+   catch(e){errors.push(`${symbols[i]}: ${e.message}`);}
+   if(i<symbols.length-1)await sleep(1250);
+  }
+  $("status").textContent=`Finished: ${scanResults.length} successful result(s)${errors.length?`; ${errors.length} ticker(s) failed`:''}. ${errors.slice(0,2).join(" | ")}`;
+  render();
+ } finally {$("scanBtn").disabled=false;}
+});
+$("sortBy").addEventListener("change",render);
+$("minScore").addEventListener("change",render);
+$("clearBtn").addEventListener("click",()=>{scanResults=[];render();$("status").textContent="Results cleared.";});
+$("exportBtn").addEventListener("click",()=>{
+  const cols=["symbol","date","price","momentum","momentum5","avg50","avg100","above50","trend50v100","score"];
+  const csv=[cols.join(","),...scanResults.map(s=>cols.map(k=>{let v=s[k];if(v==null)v="";if(typeof v==="string")v='"'+v.replace(/"/g,'""')+'"';return v;}).join(","))].join("\r\n");
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="stock-scan-results.csv";a.click();URL.revokeObjectURL(a.href);
+});
+</script>
+</body>
+</html>
